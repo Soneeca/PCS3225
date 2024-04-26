@@ -1,0 +1,214 @@
+library ieee;
+use ieee.numeric_bit.ALL;
+use ieee.math_real.CEIL;
+use ieee.math_real.LOG2;
+
+entity regfile is 
+	generic(
+		regn: natural := 32;
+		wordSize: natural := 16
+	);
+	port(
+		clock :	 	in  bit;
+		reset : 	in  bit;
+		regWrite : 	in  bit;
+		rr1, rr2, wr: in bit_vector(natural(ceil(log2(real(regn)))) -1 downto 0);
+		d	  : in  bit_vector(wordSize-1 downto 0);
+		q1, q2: out bit_vector(wordSize-1 downto 0)
+	);
+end regfile;
+
+architecture arquitetura of regfile is	
+
+	type   registrador is array (0 to regn-1) of bit_vector (wordSize-1 downto 0);
+
+	signal rg : registrador;
+
+begin
+          
+            flipflop: process(clock, reset) begin
+            
+            apagador: for z in 0 to wordSize-1 loop
+		  		rg(regn-1)(z) <= '0';
+            end loop apagador;
+            
+			if reset = '1' then
+				apagador2: for x in 0 to regn-1 loop
+					apagador3: for y in 0 to wordSize-1 loop
+					  rg(x)(y) <= '0';
+        			end loop apagador3;
+        		end loop apagador2;
+			elsif clock = '1' and clock'event then
+				if regWrite = '1' then
+					if to_integer(unsigned(wr)) < regn-1 then
+						rg(to_integer(unsigned(wr))) <= d;
+					end if;
+				end if;
+			end if;
+		end process;
+	q1 <= rg(to_integer(unsigned(rr1)));
+	q2 <= rg(to_integer(unsigned(rr2)));
+end arquitetura;
+
+LIBRARY IEEE;
+
+entity BIT_ADDER is
+port( a, b, cin         : in  bit;
+              sum, cout         : out bit );
+end BIT_ADDER;
+
+architecture BHV of BIT_ADDER is
+begin
+
+        sum <=  (not a and not b and cin) or
+                        (not a and b and not cin) or
+                        (a and not b and not cin) or
+                        (a and b and cin);
+
+        cout <= (not a and b and cin) or
+                        (a and not b and cin) or
+                        (a and b and not cin) or
+                        (a and b and cin);
+end BHV;
+
+LIBRARY ieee;
+
+
+ENTITY add2 IS
+PORT( a, b  : IN  bit_vector(1 DOWNTO 0);
+          cin   : IN  bit;
+          ans   : OUT bit_vector(1 DOWNTO 0);
+          cout  : OUT bit
+    );
+END add2;
+
+ARCHITECTURE STRUCTURE OF add2 IS
+
+    COMPONENT BIT_ADDER
+        PORT( a, b, cin  : IN  bit;
+                sum, cout  : OUT bit
+        );
+    END COMPONENT;
+
+    SIGNAL c1 : bit;
+
+BEGIN
+
+    b_adder0: BIT_ADDER PORT MAP (a(0), b(0), cin, ans(0), c1);
+    b_adder1: BIT_ADDER PORT MAP (a(1), b(1), c1, ans(1), cout);
+
+END STRUCTURE;
+
+
+LIBRARY ieee;
+
+entity add16 is
+    PORT (  a, b : IN  bit_vector(15 DOWNTO 0);
+            cin  : IN  bit;
+            sum1 : OUT bit_vector(15 DOWNTO 0);
+            cout : OUT bit);
+END add16;
+
+ARCHITECTURE arch16 OF add16 IS
+
+    COMPONENT add2
+        PORT(  a, b      : IN    bit_vector(1 DOWNTO 0);
+               cin       : IN    bit;
+               ans       : OUT   bit_vector(1 DOWNTO 0);
+               cout      : OUT   bit);
+    END COMPONENT;
+
+    SIGNAL c1, c2, c3, c4, c5, c6, c7  : bit;
+
+BEGIN
+
+    D_adder0: add2 PORT MAP ( a(1  DOWNTO 0)  , b(1 DOWNTO 0)  , cin, sum1(1 DOWNTO 0)   , c1  );
+    D_adder1: add2 PORT MAP ( a(3  DOWNTO 2)  , b(3 DOWNTO 2)  , c1 , sum1(3 DOWNTO 2)   , c2  );
+    D_adder2: add2 PORT MAP ( a(5  DOWNTO 4)  , b(5 DOWNTO 4)  , c2 , sum1(5 DOWNTO 4)   , c3  );
+    D_adder3: add2 PORT MAP ( a(7  DOWNTO 6)  , b(7 DOWNTO 6)  , c3 , sum1(7 DOWNTO 6)   , c4  );
+    D_adder4: add2 PORT MAP ( a(9  DOWNTO 8)  , b(9 DOWNTO 8)  , c4 , sum1(9 DOWNTO 8)   , c5  );
+    D_adder5: add2 PORT MAP ( a(11 DOWNTO 10) , b(11 DOWNTO 10), c5 , sum1(11 DOWNTO 10) , c6  );
+    D_adder6: add2 PORT MAP ( a(13 DOWNTO 12) , b(13 DOWNTO 12), c6 , sum1(13 DOWNTO 12) , c7  );
+    D_adder7: add2 PORT MAP ( a(15 DOWNTO 14) , b(15 DOWNTO 14), c7 , sum1(15 DOWNTO 14) , cout);
+
+END arch16;
+
+library ieee;
+use ieee.numeric_bit.ALL;
+use ieee.math_real.ALL;
+
+entity calc is
+	port(
+		clock		: in  bit;
+		reset		: in  bit;
+		instruction	: in  bit_vector(15 downto 0);
+		overflow   	: out bit;
+		q1			: out bit_vector(15 downto 0)
+	);
+end calc;
+
+architecture archcalc of calc is
+	component regfile is
+	port(
+		  clock :	 	in  bit;
+		  reset : 	in  bit;
+		  regWrite : 	in  bit;
+    	  rr1, rr2, wr: in bit_vector(natural(ceil(log2(real(32)))) -1 downto 0);
+    	  d	  : in  bit_vector(15 downto 0);
+     	  q1, q2: out bit_vector(15 downto 0)
+	);
+	end component regfile;
+	
+	component add16 is
+	port(
+     	 a,b: in 	bit_vector(15 downto 0);
+  	    cin  : IN  bit;
+     	 sum1 : OUT bit_vector(15 DOWNTO 0);
+         cout : OUT bit
+    );
+	end component add16;
+	signal esco: bit_vector(1 downto 0);
+	signal end1, end2, destino: bit_vector(4 downto 0);
+	signal dado1, dado2, dadoi, dadosomar, ss: bit_vector(15 downto 0);  
+	
+	begin
+		end2  <= instruction(14 downto 10);
+		end1  <= instruction(9 downto 5);
+		destino   <= instruction(4 downto 0);
+      
+    		with end2(4) select
+     		 	dadoi <= 	("00000000000" & end2) 	when '0',
+          		  		("11111111111" & end2)	when '1',
+      	    	    			"0000000000000000"    	when others;
+      	
+       		with instruction(15) select
+      		     dadosomar <=	dadoi  	when '0',
+					dado2   when '1',
+			"0000000000000000"      when others;
+		  
+		registrador: regfile port map (
+			clock => clock,
+			reset => reset,
+			regWrite => '1',
+			rr1 => end1,
+			rr2 => end2,
+			wr => destino,
+			d => ss,
+			q1 => dado1,
+			q2 => dado2
+		);
+      
+   	   soma: add16 port map(
+			a  => dado1,
+			b  => dadosomar,
+         	cin => '0',
+			sum1  => ss,
+			cout => open
+		);
+      esco <= (dado1(15) and dadosomar(15)) & not(dado1(15) or dadosomar(15));
+      with esco select
+      overflow <= ss(15) when "01",
+      	(not(ss(15)))  when "10",
+     	'0' when others;   
+		q1 <= dado1;
+end archcalc;
